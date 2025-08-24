@@ -1,0 +1,835 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Тетріс-Гусак — Реліз</title>
+<style>
+  :root{
+    --bg: radial-gradient(circle at 20% 20%, #c9f1ff 0%, #e9fbff 30%, #bfe9ff 60%, #a6dcff 100%);
+    --cloud: rgba(255,255,255,0.7);
+    --goose-body:#ffffff;
+    --goose-outline:#222;
+    --beak:#ffa500;
+    --leg:#f0b14a;
+    --eye:#111;
+    --accent:#7ad1ff;
+    --wing:#eaeaea;
+    --play-bg:#f7fbff;
+    --bubble:#fffbe6;
+    --shadow: rgba(0,0,0,0.12);
+    --ghost: rgba(0,0,0,0.18);
+  }
+  .theme-white { --goose-body:#ffffff; --wing:#ececec; --play-bg:#f7fbff; --eye:#111; --goose-outline:#222; }
+  .theme-gray  { --goose-body:#dfe2e6; --wing:#caced6; --play-bg:#eef2f6; --eye:#111; --goose-outline:#222; }
+  .theme-black { --goose-body:#2b2b2b; --wing:#3a3a3a; --play-bg:#24262a; --eye:#eee; --goose-outline:#111; }
+
+  html,body{
+    height:100%; margin:0;
+    background: var(--bg);
+    overflow:hidden; touch-action: manipulation;
+    -webkit-user-select:none; user-select:none;
+    font-family: ui-rounded, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
+    color:#111;
+  }
+  body::before, body::after{
+    content:""; position:fixed; inset:0;
+    background:
+      radial-gradient(25vmin 12vmin at 15% 25%, var(--cloud), transparent 60%),
+      radial-gradient(20vmin 10vmin at 35% 20%, var(--cloud), transparent 60%),
+      radial-gradient(30vmin 13vmin at 65% 30%, var(--cloud), transparent 60%),
+      radial-gradient(22vmin 11vmin at 80% 18%, var(--cloud), transparent 60%),
+      radial-gradient(26vmin 12vmin at 75% 65%, var(--cloud), transparent 60%),
+      radial-gradient(20vmin 10vmin at 25% 75%, var(--cloud), transparent 60%);
+    opacity:0.35; pointer-events:none;
+  }
+  body::after{ filter: blur(10px); opacity:0.25; }
+
+  .stage{ position:relative; width:min(94vmin, 980px); aspect-ratio: 16/10; margin: 1.5vmin auto; }
+
+  .goose{ position:absolute; inset:0; display:grid; place-items:center; filter: drop-shadow(0 10px 20px var(--shadow)); }
+  .goose-body{
+    position:relative; width:100%; height:100%;
+    background: var(--goose-body);
+    border: 6px solid var(--goose-outline);
+    border-radius: 50% 50% 45% 55% / 55% 55% 45% 45%;
+  }
+  .neck{
+    position:absolute; right:10%; top:6%;
+    width:18%; height:44%;
+    background: var(--goose-body);
+    border:6px solid var(--goose-outline); border-bottom:none;
+    border-radius: 40% / 60%; transform: rotate(18deg); z-index:2;
+  }
+  .head{
+    position:absolute; right:0%; top:-10%;
+    width:30%; height:38%;
+    background: var(--goose-body);
+    border:6px solid var(--goose-outline); border-radius:50%;
+    transform: translate(28%, 10%); z-index:3;
+  }
+  .eye{ position:absolute; width:22%; height:28%;
+    background:#fff; border:5px solid var(--goose-outline); border-radius:50%;
+    top:26%; display:grid; place-items:center; overflow:hidden;
+  }
+  .eye.left{ left:12%; } .eye.right{ right:12%; }
+  .eye .eye-text{ font-weight:800; font-size: clamp(12px, 2.4vmin, 22px); color: var(--eye); text-shadow: 0 1px 0 #fff5, 0 2px 0 #fff3; }
+  .eye::before{ content:""; position:absolute; left:0; right:0; height:50%;
+    background: var(--goose-body); border-bottom:5px solid var(--goose-outline);
+    transform-origin: top; animation: blink 6s infinite; z-index:2;
+  }
+  @keyframes blink { 0%, 2%, 100% { transform: scaleY(0);} 1% { transform: scaleY(1);} }
+
+  .beak{ position:absolute; right:-2%; top:14%; width:26%; height:16%;
+    background: linear-gradient(#ffb84d,#ff9d1a);
+    border:6px solid var(--goose-outline); border-left:none;
+    border-radius: 0 60% 60% 0 / 50% 50% 50% 50%; z-index:4;
+  }
+  .wing{ position:absolute; left:8%; bottom:22%; width:34%; height:28%;
+    background: var(--wing); border:6px solid var(--goose-outline);
+    border-radius: 60% 40% 50% 50%; transform: rotate(-12deg); z-index:1;
+    transition: filter 0.2s, transform 0.2s;
+  }
+  .wing.wing-blink{ filter: drop-shadow(0 0 12px #fff176); transform: rotate(-12deg) scale(1.03); }
+  .leg{ position:absolute; bottom:-2%; width:9%; height:18%;
+    background: #f0b14a; border:6px solid var(--goose-outline);
+    border-top:none; border-radius: 0 0 30% 30%; z-index:0;
+  }
+  .leg.left{ left:34%; transform: rotate(4deg);} .leg.right{ left:52%; transform: rotate(-6deg);}
+
+  .belly{
+    position:absolute; left:22%; right:22%; top:35%; bottom:10%;
+    background: var(--play-bg); border:6px solid var(--goose-outline);
+    border-radius: 18px; overflow:hidden; display:grid; grid-template-columns: 1fr auto; gap:6px; align-items:center;
+    padding:6px;
+  }
+  .play-wrap{ position:relative; width:100%; height:100%; display:grid; place-items:center; }
+  canvas{ width:100%; height:100%; image-rendering: pixelated; background: repeating-linear-gradient(0deg, transparent 0 1px, #00000008 1px 2px); }
+
+  .sidepanel{ display:grid; gap:8px; padding:4px; }
+  .mini{
+    width:94px; height:94px; background:#ffffffcf; border:2px solid #0000001a; border-radius:10px; display:grid; place-items:center;
+    box-shadow: 0 3px 8px var(--shadow); overflow:hidden;
+  }
+  .mini canvas{ width:88px; height:88px; background: #f8fbff; }
+
+  .hud{
+    position:absolute; top:6px; left:6px; right:6px;
+    display:flex; gap:8px; align-items:center; justify-content:space-between; z-index:10; pointer-events:auto;
+  }
+  .chip{
+    background:#ffffffc8; backdrop-filter: blur(4px);
+    border:2px solid #0000001a; border-radius:12px; padding:6px 10px;
+    font-size:12px; display:flex; gap:6px; align-items:center; box-shadow: 0 3px 8px var(--shadow);
+  }
+  .select{ border:none; background:transparent; font-weight:600; }
+  .btn{ appearance:none; border:none; border-radius:10px; padding:6px 10px; font-weight:700; background:#111; color:#fff; cursor:pointer; }
+  .badge{ background:#000000cc; color:#fff; padding:6px 10px; border-radius:10px; font-size:12px; font-weight:700; }
+
+  .overlay{ position:absolute; inset:0; display:grid; place-items:center; z-index:15; pointer-events:none; }
+  .bubble{ background: var(--bubble); border:3px solid #00000030; border-radius:14px; padding:10px 14px; font-weight:900; color:#222; box-shadow: 0 4px 12px var(--shadow); animation: pop 0.3s ease-out; }
+  @keyframes pop{ from{ transform:scale(0.9); opacity:0;} to{ transform:scale(1); opacity:1;} }
+  .bubble.speech{ position:absolute; top:10%; right:8%; }
+  .bubble.honk{ position:absolute; top:20%; left:12%; background:#fff4f4; border-color:#ffb3b3; }
+  .paused{ position:absolute; inset:0; background: rgba(0,0,0,0.35); display:grid; place-items:center; pointer-events:auto; }
+  .paused .panel{ background:#fff; border-radius:12px; padding:14px 18px; border:3px solid #000; font-weight:900; }
+
+  .controls{
+    position:fixed; left:0; right:0; bottom:0;
+    padding: clamp(8px, 2vmin, 16px);
+    display:flex; gap:10px; justify-content:space-between; align-items:center; z-index:20; pointer-events:auto;
+  }
+  .pad{ display:grid; grid-template-columns:repeat(3, 56px); grid-template-rows:repeat(2, 56px); gap:8px; justify-content:center; align-content:center; margin-left:6px; }
+  .pad .k{ display:grid; place-items:center; background:#ffffffc8; border:2px solid #00000022; border-radius:14px; font-size:22px; font-weight:900; box-shadow: 0 3px 8px var(--shadow); -webkit-tap-highlight-color: transparent; }
+  .pad .k:active{ transform: translateY(1px); }
+  .ctrl-right{ display:flex; gap:10px; align-items:center; }
+
+  .btn:focus-visible, .select:focus-visible, .pad .k:focus-visible, .focusable:focus-visible{
+    outline:3px solid var(--accent); outline-offset:2px;
+  }
+
+  .testbar{ position:fixed; top:6px; left:50%; transform:translateX(-50%); z-index:50; }
+  .testbar .chip{ background:#fff7; }
+
+  @media (max-width: 680px){
+    .eye .eye-text{ font-size: clamp(10px, 2.8vmin, 18px); }
+    .pad{ grid-template-columns:repeat(3, 52px); grid-template-rows:repeat(2, 52px); }
+    .mini{ width:86px; height:86px; }
+    .mini canvas{ width:80px; height:80px; }
+  }
+</style>
+</head>
+<body class="theme-white">
+  <div class="stage" id="stage">
+    <div class="goose">
+      <div class="goose-body">
+        <div class="neck"></div>
+        <div class="head">
+          <div class="eye left" aria-hidden="true"><span class="eye-text" id="eyeScore">00000</span></div>
+          <div class="eye right" aria-hidden="true"><span class="eye-text" id="eyeLevel">Рв 1</span></div>
+          <div class="beak"></div>
+        </div>
+        <div class="wing" id="wing"></div>
+        <div class="leg left"></div>
+        <div class="leg right"></div>
+
+        <div class="belly">
+          <div class="play-wrap">
+            <div id="focusTrap" class="focusable" role="application" aria-label="Ігрове поле Тетріс, керування стрілками, пробіл, C, P" tabindex="0" style="position:absolute; inset:8px; outline:none;"></div>
+            <canvas id="board" width="200" height="400" aria-label="Тетріс 10 на 20"></canvas>
+          </div>
+          <div class="sidepanel" aria-label="Панель статусу">
+            <div class="mini" aria-label="УТРИМАТИ"><canvas id="holdCanvas" width="88" height="88"></canvas></div>
+            <div class="mini" aria-label="НАСТУПНА 1"><canvas id="next1" width="88" height="88"></canvas></div>
+            <div class="mini" aria-label="НАСТУПНА 2"><canvas id="next2" width="88" height="88"></canvas></div>
+            <div class="mini" aria-label="НАСТУПНА 3"><canvas id="next3" width="88" height="88"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hud">
+      <div class="chip">
+        <strong>Тема:</strong>
+        <select id="theme" class="select" aria-label="Вибір теми гусака">
+          <option value="white">Білий</option>
+          <option value="gray">Сірий</option>
+          <option value="black">Чорний</option>
+        </select>
+      </div>
+      <div class="chip" style="gap:10px;">
+        <button id="muteBtn" class="btn" aria-pressed="false" aria-label="Звук вкл/викл">🔊 Звук</button>
+        <button id="restartBtn" class="btn" aria-label="Почати знову">Знову</button>
+        <button id="pauseBtn" class="btn" aria-label="Пауза/Продовжити">Пауза (P)</button>
+      </div>
+      <div class="chip">
+        <span id="bestBadge" class="badge" title="Рекорд">Рекорд: 0</span>
+      </div>
+    </div>
+
+    <div class="overlay" id="overlay" aria-live="polite" aria-atomic="true"></div>
+  </div>
+
+  <div class="controls" aria-hidden="false">
+    <div class="pad" aria-label="Кнопки керування">
+      <button class="k" data-key="ArrowLeft" aria-label="Вліво">◀️</button>
+      <button class="k" data-key="ArrowUp" aria-label="Повернути">⤴️</button>
+      <button class="k" data-key="ArrowRight" aria-label="Вправо">▶️</button>
+      <button class="k" data-key="KeyC" aria-label="Утримати">🧊</button>
+      <button class="k" data-key="ArrowDown" aria-label="Вниз">🔽</button>
+      <button class="k" data-key="Space" aria-label="Різке падіння">⏬</button>
+    </div>
+    <div class="ctrl-right">
+      <div class="chip">Керування: ← → — рух, ↑/X/Z — поворот, ↓ — прискорити, Пробіл — різке падіння, C/Shift — утримати, P — пауза</div>
+    </div>
+  </div>
+
+  <div class="testbar" id="testbar" style="display:none;">
+    <div class="chip"><button id="runTests" class="btn">Run Tests</button><span id="testStatus">idle</span></div>
+  </div>
+
+<script>
+/* ================= SAV_SYSTEM 4.0: OutputManager begins (single-file) ================= */
+(function(){
+'use strict';
+
+/* ---------- Constants & Config ---------- */
+const WIDTH = 10, HEIGHT = 20;
+const DROP_BASE_MS = 900, DROP_MIN_MS = 80, LEVEL_LINES = 10;
+const LOCK_DELAY_MS = 500;
+const SCORE_TABLE = [0, 100, 300, 500, 800]; // x (level+1)
+const SOFT_DROP_POINT = 1;
+const HARD_DROP_POINT = 2;
+const DAS_MS = 140, ARR_MS = 50;
+
+const COLORS = {
+  I:'#00cbe6', J:'#3b6ee8', L:'#f2a34f', O:'#f2d64f', S:'#4fd68a', T:'#b568f2', Z:'#e85b6c'
+};
+
+/* ---------- SRS Pieces (4x4 matrices), Rotation States: 0,R,2,L ---------- */
+const PIECES = {
+  I: [
+    [ [0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0] ],
+    [ [0,0,1,0],[0,0,1,0],[0,0,1,0],[0,0,1,0] ],
+    [ [0,0,0,0],[0,0,0,0],[1,1,1,1],[0,0,0,0] ],
+    [ [0,1,0,0],[0,1,0,0],[0,1,0,0],[0,1,0,0] ],
+  ],
+  J: [
+    [ [1,0,0,0],[1,1,1,0],[0,0,0,0],[0,0,0,0] ],
+    [ [0,1,1,0],[0,1,0,0],[0,1,0,0],[0,0,0,0] ],
+    [ [0,0,0,0],[1,1,1,0],[0,0,1,0],[0,0,0,0] ],
+    [ [0,1,0,0],[0,1,0,0],[1,1,0,0],[0,0,0,0] ],
+  ],
+  L: [
+    [ [0,0,1,0],[1,1,1,0],[0,0,0,0],[0,0,0,0] ],
+    [ [0,1,0,0],[0,1,0,0],[0,1,1,0],[0,0,0,0] ],
+    [ [0,0,0,0],[1,1,1,0],[1,0,0,0],[0,0,0,0] ],
+    [ [1,1,0,0],[0,1,0,0],[0,1,0,0],[0,0,0,0] ],
+  ],
+  O: [
+    [ [0,1,1,0],[0,1,1,0],[0,0,0,0],[0,0,0,0] ],
+    [ [0,1,1,0],[0,1,1,0],[0,0,0,0],[0,0,0,0] ],
+    [ [0,1,1,0],[0,1,1,0],[0,0,0,0],[0,0,0,0] ],
+    [ [0,1,1,0],[0,1,1,0],[0,0,0,0],[0,0,0,0] ],
+  ],
+  S: [
+    [ [0,1,1,0],[1,1,0,0],[0,0,0,0],[0,0,0,0] ],
+    [ [0,1,0,0],[0,1,1,0],[0,0,1,0],[0,0,0,0] ],
+    [ [0,0,0,0],[0,1,1,0],[1,1,0,0],[0,0,0,0] ],
+    [ [1,0,0,0],[1,1,0,0],[0,1,0,0],[0,0,0,0] ],
+  ],
+  T: [
+    [ [0,1,0,0],[1,1,1,0],[0,0,0,0],[0,0,0,0] ],
+    [ [0,1,0,0],[0,1,1,0],[0,1,0,0],[0,0,0,0] ],
+    [ [0,0,0,0],[1,1,1,0],[0,1,0,0],[0,0,0,0] ],
+    [ [0,1,0,0],[1,1,0,0],[0,1,0,0],[0,0,0,0] ],
+  ],
+  Z: [
+    [ [1,1,0,0],[0,1,1,0],[0,0,0,0],[0,0,0,0] ],
+    [ [0,0,1,0],[0,1,1,0],[0,1,0,0],[0,0,0,0] ],
+    [ [0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0] ],
+    [ [0,1,0,0],[1,1,0,0],[1,0,0,0],[0,0,0,0] ],
+  ],
+};
+
+/* ---------- SRS Kick Tables ---------- */
+// JLSTZ
+const KICKS = {
+  JLSTZ: {
+    '0>R': [[0,0],[-1,0],[-1,1],[0,-2],[-1,-2]],
+    'R>0': [[0,0],[1,0],[1,-1],[0,2],[1,2]],
+    'R>2': [[0,0],[1,0],[1,-1],[0,2],[1,2]],
+    '2>R': [[0,0],[-1,0],[-1,1],[0,-2],[-1,-2]],
+    '2>L': [[0,0],[1,0],[1,1],[0,-2],[1,-2]],
+    'L>2': [[0,0],[-1,0],[-1,-1],[0,2],[-1,2]],
+    'L>0': [[0,0],[-1,0],[-1,-1],[0,2],[-1,2]],
+    '0>L': [[0,0],[1,0],[1,1],[0,-2],[1,-2]],
+  },
+  // I-piece
+  I: {
+    '0>R': [[0,0],[-2,0],[1,0],[-2,-1],[1,2]],
+    'R>0': [[0,0],[2,0],[-1,0],[2,1],[-1,-2]],
+    'R>2': [[0,0],[-1,0],[2,0],[-1,2],[2,-1]],
+    '2>R': [[0,0],[1,0],[-2,0],[1,-2],[-2,1]],
+    '2>L': [[0,0],[2,0],[-1,0],[2,1],[-1,-2]],
+    'L>2': [[0,0],[-2,0],[1,0],[-2,-1],[1,2]],
+    'L>0': [[0,0],[1,0],[-2,0],[1,-2],[-2,1]],
+    '0>L': [[0,0],[-1,0],[2,0],[-1,2],[2,-1]],
+  }
+};
+
+/* ---------- Utilities ---------- */
+function rotateMatrixCW(m){
+  const N = m.length; const r = Array.from({length:N},()=>Array(N).fill(0));
+  for(let y=0;y<N;y++) for(let x=0;x<N;x++) r[x][N-1-y] = m[y][x];
+  return r;
+}
+function rotateMatrixCCW(m){
+  const N = m.length; const r = Array.from({length:N},()=>Array(N).fill(0));
+  for(let y=0;y<N;y++) for(let x=0;x<N;x++) r[N-1-x][y] = m[y][x];
+  return r;
+}
+function deepClone(a){ return JSON.parse(JSON.stringify(a)); }
+
+function createBoard(){
+  return Array.from({length:HEIGHT}, ()=>Array(WIDTH).fill(null));
+}
+function collide(board, piece, pos){
+  const N = piece.length;
+  for(let y=0;y<N;y++){
+    for(let x=0;x<N;x++){
+      if(!piece[y][x]) continue;
+      const nx = pos.x + x;
+      const ny = pos.y + y;
+      if(nx<0 || nx>=WIDTH || ny>=HEIGHT) return true;
+      if(ny>=0 && board[ny][nx]) return true;
+    }
+  }
+  return false;
+}
+function merge(board, piece, pos, color){
+  const N = piece.length;
+  for(let y=0;y<N;y++){
+    for(let x=0;x<N;x++){
+      if(piece[y][x]){
+        const nx=pos.x+x, ny=pos.y+y;
+        if(ny>=0) board[ny][nx] = color;
+      }
+    }
+  }
+}
+function clearLines(board){
+  let cleared = 0;
+  outer: for(let y=HEIGHT-1;y>=0;y--){
+    for(let x=0;x<WIDTH;x++){ if(!board[y][x]) continue outer; }
+    board.splice(y,1);
+    board.unshift(Array(WIDTH).fill(null));
+    cleared++; y++;
+  }
+  return cleared;
+}
+
+/* ---------- Randomizer ---------- */
+class Bag {
+  constructor(){ this.bag=[]; this.refill(); }
+  refill(){
+    this.bag = ['I','J','L','O','S','T','Z'];
+    for(let i=this.bag.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [this.bag[i], this.bag[j]] = [this.bag[j], this.bag[i]];
+    }
+  }
+  next(){ if(this.bag.length===0) this.refill(); return this.bag.pop(); }
+}
+
+/* ---------- Audio (simple beeps) ---------- */
+class AudioFX{
+  constructor(){
+    this.enabled = (localStorage.getItem('tg_mute')!=='1');
+    this.ctx = null;
+  }
+  toggle(){
+    this.enabled = !this.enabled; localStorage.setItem('tg_mute', this.enabled?'0':'1');
+    return this.enabled;
+  }
+  init(){ if(!this.ctx) this.ctx = new (window.AudioContext||window.webkitAudioContext)(); }
+  beep(freq=440, dur=0.06, type='square', gain=0.02){
+    if(!this.enabled) return;
+    try{
+      this.init();
+      const ctx = this.ctx, t = ctx.currentTime;
+      const o = ctx.createOscillator(); const g = ctx.createGain();
+      o.type = type; o.frequency.setValueAtTime(freq, t);
+      g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+      o.connect(g).connect(ctx.destination); o.start(t); o.stop(t+dur);
+    }catch(e){}
+  }
+}
+
+/* ---------- Game ---------- */
+class Game {
+  constructor(){
+    this.reset();
+  }
+  reset(){
+    this.board = createBoard();
+    this.bag = new Bag();
+    this.nextQueue = [this.bag.next(), this.bag.next(), this.bag.next(), this.bag.next(), this.bag.next()];
+    this.holdPiece = null;
+    this.holdUsed = false;
+
+    this.score = 0;
+    this.best = Number(localStorage.getItem('tetris_goose_best')||0);
+    this.level = 0;
+    this.lines = 0;
+
+    this.dropMs = DROP_BASE_MS;
+    this.dropAcc = 0;
+
+    this.gameOver = false;
+    this.paused = false;
+
+    this.lockTimer = null;
+    this.onLinesCleared = null;
+    this.onWing = null;
+
+    this.spawn();
+  }
+  currentMatrix(){ return PIECES[this.current.kind][this.current.rot]; }
+
+  spawn(){
+    const kind = this.nextQueue.shift();
+    this.nextQueue.push(this.bag.next());
+    this.current = {
+      kind,
+      color: COLORS[kind],
+      rot: 0, // 0,R,2,L => 0..3
+      pos: { x: 3, y: -2 } // for 4x4 shapes fits center
+    };
+    this.holdUsed = false;
+    if(collide(this.board, this.currentMatrix(), this.current.pos)){
+      this.gameOver = true;
+    }
+  }
+
+  softDrop(){
+    if(this.tryMove(0,1)){
+      this.score += SOFT_DROP_POINT;
+      return true;
+    } else {
+      this.startLockTimer();
+      return false;
+    }
+  }
+
+  hardDrop(){
+    if(this.gameOver) return 0;
+    let dist = 0;
+    while(this.tryMove(0,1)) dist++;
+    if(dist>0){
+      this.score += dist * HARD_DROP_POINT;
+      this.lock(true); // immediate
+    }
+    return dist;
+  }
+
+  hold(){
+    if(this.holdUsed || this.gameOver) return;
+    const cur = this.current.kind;
+    if(this.holdPiece===null){
+      this.holdPiece = cur;
+      this.spawn();
+    } else {
+      this.current.kind = this.holdPiece;
+      this.current.rot = 0;
+      this.current.pos = {x:3, y:-2};
+      this.holdPiece = cur;
+      if(collide(this.board, this.currentMatrix(), this.current.pos)){
+        // cannot place swapped piece → game over
+        this.gameOver = true;
+      }
+    }
+    this.holdUsed = true;
+  }
+
+  tryMove(dx, dy){
+    if(this.gameOver) return false;
+    const pos = { x: this.current.pos.x + dx, y: this.current.pos.y + dy };
+    if(!collide(this.board, this.currentMatrix(), pos)){
+      this.current.pos = pos;
+      if(dy!==0) this.dropAcc = 0;
+      this.resetLockTimerIfActive();
+      return true;
+    }
+    return false;
+  }
+
+  rotate(dir){ // dir = +1 (CW) or -1 (CCW)
+    if(this.gameOver) return false;
+    const from = this.current.rot;
+    const to = (from + (dir===1?1:3)) % 4;
+    const kind = this.current.kind;
+    const isI = (kind==='I'), isO = (kind==='O');
+
+    if(isO){
+      // O piece has no kicks (centered)
+      const prevRot = this.current.rot;
+      this.current.rot = to;
+      if(collide(this.board, this.currentMatrix(), this.current.pos)){
+        this.current.rot = prevRot; return false;
+      }
+      this.resetLockTimerIfActive(); return true;
+    }
+
+    const kicks = (isI? KICKS.I : KICKS.JLSTZ)[`${stateName(from)}> ${stateName(to)}`.replace('> ', '>')] || [];
+    // prepare rotated matrix (for collision checks only)
+    const prevRot = this.current.rot;
+    this.current.rot = to;
+    const piece = this.currentMatrix();
+
+    for(const [kx, ky] of kicks){
+      const pos = { x: this.current.pos.x + kx, y: this.current.pos.y + ky };
+      if(!collide(this.board, piece, pos)){
+        this.current.pos = pos;
+        this.resetLockTimerIfActive();
+        return true;
+      }
+    }
+    this.current.rot = prevRot;
+    return false;
+  }
+
+  startLockTimer(){
+    if(this.lockTimer || this.gameOver) return;
+    this.lockTimer = setTimeout(()=> this.lock(false), LOCK_DELAY_MS);
+  }
+  resetLockTimerIfActive(){
+    if(this.lockTimer){
+      clearTimeout(this.lockTimer);
+      this.lockTimer = setTimeout(()=> this.lock(false), LOCK_DELAY_MS);
+    }
+  }
+  lock(immediate=false){
+    if(this.lockTimer){ clearTimeout(this.lockTimer); this.lockTimer=null; }
+    merge(this.board, this.currentMatrix(), this.current.pos, this.current.color);
+    const cleared = clearLines(this.board);
+    if(cleared>0){
+      const gained = (SCORE_TABLE[cleared] || 0) * (this.level+1);
+      this.score += gained;
+      this.lines += cleared;
+      const newLevel = Math.floor(this.lines / LEVEL_LINES);
+      if(newLevel !== this.level){
+        this.level = newLevel;
+        this.dropMs = Math.max(DROP_MIN_MS, Math.floor(DROP_BASE_MS * Math.pow(0.85, this.level)));
+      }
+      if(this.score > this.best){
+        this.best = this.score;
+        localStorage.setItem('tetris_goose_best', String(this.best));
+      }
+      if(this.onLinesCleared) this.onLinesCleared(cleared, gained);
+    }
+    this.spawn();
+  }
+}
+
+function stateName(r){ return ['0','R','2','L'][r%4]; }
+
+/* ---------- Renderer ---------- */
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+const holdCanvas = document.getElementById('holdCanvas');
+const nextCanvases = [document.getElementById('next1'), document.getElementById('next2'), document.getElementById('next3')];
+const eyeScore = document.getElementById('eyeScore');
+const eyeLevel = document.getElementById('eyeLevel');
+const wing = document.getElementById('wing');
+const overlay = document.getElementById('overlay');
+const focusTrap = document.getElementById('focusTrap');
+const themeSelect = document.getElementById('theme');
+const bestBadge = document.getElementById('bestBadge');
+const restartBtn = document.getElementById('restartBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const muteBtn = document.getElementById('muteBtn');
+const controlButtons = document.querySelectorAll('.pad .k');
+const testbar = document.getElementById('testbar');
+const runTestsBtn = document.getElementById('runTests');
+const testStatus = document.getElementById('testStatus');
+
+const game = new Game();
+const audio = new AudioFX();
+
+function setTheme(name){
+  document.body.classList.remove('theme-white','theme-gray','theme-black');
+  document.body.classList.add('theme-'+name);
+  localStorage.setItem('tetris_goose_theme', name);
+}
+themeSelect.addEventListener('change', (e)=> setTheme(e.target.value));
+setTheme(localStorage.getItem('tetris_goose_theme') || 'white');
+themeSelect.value = localStorage.getItem('tetris_goose_theme') || 'white';
+
+function setMuteUI(){
+  const m = localStorage.getItem('tg_mute')==='1';
+  muteBtn.textContent = m ? '🔇 Звук' : '🔊 Звук';
+  muteBtn.setAttribute('aria-pressed', (!m).toString());
+}
+muteBtn.addEventListener('click', ()=> { const on = audio.toggle(); setMuteUI(); if(on) audio.beep(660,0.05); });
+setMuteUI();
+
+function updateHUD(){
+  eyeScore.textContent = String(game.score).padStart(5,'0');
+  eyeLevel.textContent = 'Рв ' + (game.level+1);
+  bestBadge.textContent = 'Рекорд: ' + game.best;
+}
+
+/* DPR scaling */
+function resizeCanvas(){
+  const belly = canvas.parentElement.getBoundingClientRect();
+  const cell = Math.floor(Math.min(belly.width / WIDTH, belly.height / HEIGHT));
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  canvas.style.width = (cell * WIDTH) + 'px';
+  canvas.style.height = (cell * HEIGHT) + 'px';
+  canvas.width = cell * WIDTH * dpr;
+  canvas.height = cell * HEIGHT * dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize', resizeCanvas, {passive:true});
+resizeCanvas();
+
+/* Drawing cells */
+function drawCell(gx, gy, color, cell){
+  const px = gx*cell, py = gy*cell;
+  ctx.fillStyle = color || '#e8eef6';
+  ctx.fillRect(px, py, cell, cell);
+  if(color){
+    ctx.fillStyle = 'rgba(0,0,0,0.08)'; ctx.fillRect(px, py+cell-2, cell, 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(px, py, cell, 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.06)';
+    ctx.fillRect(px+Math.floor(cell*0.25), py+Math.floor(cell*0.25), 2, 2);
+    ctx.fillRect(px+Math.floor(cell*0.65), py+Math.floor(cell*0.55), 2, 2);
+  } else {
+    ctx.strokeStyle = 'rgba(0,0,0,0.04)'; ctx.strokeRect(px+0.5, py+0.5, cell-1, cell-1);
+  }
+}
+function drawGhost(piece, pos){
+  const cell = Math.floor(canvas.height / Math.max(HEIGHT,1));
+  // simulate drop
+  let gy = pos.y, gx = pos.x;
+  const m = piece;
+  while(!collide(game.board, m, {x:gx, y:gy+1})) gy++;
+  // draw as outline/ghost
+  ctx.globalAlpha = 0.35;
+  for(let y=0;y<4;y++) for(let x=0;x<4;x++){
+    if(m[y][x] && gy+y>=0){
+      const px = (gx+x)*cell, py = (gy+y)*cell;
+      ctx.fillStyle = 'var(--ghost)'; ctx.fillRect(px,py,cell,cell);
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+function drawBoard(){
+  const cell = Math.floor(canvas.height / HEIGHT);
+  ctx.clearRect(0,0,canvas.width, canvas.height);
+  // Board
+  for(let y=0;y<HEIGHT;y++) for(let x=0;x<WIDTH;x++) drawCell(x,y, game.board[y][x], cell);
+  // Ghost
+  drawGhost(game.currentMatrix(), game.current.pos);
+  // Current piece
+  const m = game.currentMatrix();
+  for(let y=0;y<4;y++) for(let x=0;x<4;x++){
+    if(m[y][x]){
+      const gx = game.current.pos.x + x, gy = game.current.pos.y + y;
+      if(gy>=0) drawCell(gx, gy, game.current.color, cell);
+    }
+  }
+}
+
+/* Mini renderers (hold/next) */
+function drawMini(canv, kind){
+  const c = canv.getContext('2d');
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  const W = canv.width, H = canv.height;
+  c.setTransform(1,0,0,1,0,0);
+  c.clearRect(0,0,W,H);
+  const cell = Math.floor(Math.min(W,H)/6);
+  const ox = Math.floor(W/(2*cell)) - 2, oy = 1; // center
+  if(!kind) return;
+  const m = PIECES[kind][0];
+  for(let y=0;y<4;y++) for(let x=0;x<4;x++){
+    if(m[y][x]){
+      const gx = ox + x, gy = oy + y;
+      c.fillStyle = COLORS[kind];
+      c.fillRect(gx*cell, gy*cell, cell, cell);
+      c.fillStyle = 'rgba(0,0,0,0.08)'; c.fillRect(gx*cell, gy*cell+cell-2, cell, 2);
+      c.fillStyle = 'rgba(255,255,255,0.35)'; c.fillRect(gx*cell, gy*cell, cell, 2);
+    }
+  }
+}
+
+/* Wing feedback */
+function wingBlink(){ wing.classList.add('wing-blink'); setTimeout(()=> wing.classList.remove('wing-blink'), 260); }
+
+/* Bubbles */
+function showBubble(text, kind='speech', ms=1200){
+  const b = document.createElement('div');
+  b.className = 'bubble ' + kind; b.textContent = text;
+  overlay.appendChild(b);
+  setTimeout(()=> { b.style.transition = 'opacity 0.25s, transform 0.25s'; b.style.opacity = '0'; b.style.transform = 'translateY(-8px)'; setTimeout(()=> b.remove(), 300); }, ms);
+}
+
+/* Pause overlay */
+let pauseLayer = null;
+function renderPauseOverlay(){
+  if(game.paused){
+    if(!pauseLayer){
+      pauseLayer = document.createElement('div');
+      pauseLayer.className = 'paused';
+      pauseLayer.innerHTML = `<div class="panel" role="dialog" aria-label="Пауза">Пауза — натисни P або Esc, щоб продовжити</div>`;
+      document.querySelector('.stage').appendChild(pauseLayer);
+    }
+  } else {
+    if(pauseLayer){ pauseLayer.remove(); pauseLayer=null; }
+  }
+}
+
+/* ---------- Input (DAS/ARR) ---------- */
+const keyState = {}; // code -> {pressed, das, arr}
+function doMove(code){
+  if(code==='ArrowLeft' || code==='KeyA') game.tryMove(-1,0);
+  else if(code==='ArrowRight' || code==='KeyD') game.tryMove(1,0);
+  else if(code==='ArrowDown' || code==='KeyS'){ game.softDrop(); audio.beep(200,0.02,'sine',0.01); }
+}
+function handlePress(code){
+  if(game.paused || game.gameOver) return;
+  if(code==='ArrowUp' || code==='KeyX' || code==='KeyW'){ if(game.rotate(+1)) audio.beep(550,0.03,'triangle',0.01); return; }
+  if(code==='KeyZ'){ if(game.rotate(-1)) audio.beep(520,0.03,'triangle',0.01); return; }
+  if(code==='Space'){ const d = game.hardDrop(); if(d>0){ audio.beep(180,0.04,'sawtooth',0.02); audio.beep(300,0.05,'sawtooth',0.015); } return; }
+  if(code==='KeyC' || code==='ShiftLeft' || code==='ShiftRight'){ game.hold(); audio.beep(420,0.03,'square',0.015); return; }
+  if(code==='ArrowLeft' || code==='ArrowRight' || code==='ArrowDown' || code==='KeyA' || code==='KeyD' || code==='KeyS'){
+    if(keyState[code]?.pressed) return; //  <-- ОСЬ ТУТ БУЛА ПОМИЛКА, Я ВИПРАВИВ
+    keyState[code] = { pressed: true, das: null, arr: null };
+    doMove(code);
+    audio.beep(320,0.02,'sine',0.01);
+    keyState[code].das = setTimeout(()=>{
+      keyState[code].arr = setInterval(()=> { doMove(code); }, ARR_MS);
+    }, DAS_MS);
+  }
+}
+function handleRelease(code){
+  if(!keyState[code]) return;
+  if(keyState[code].das) clearTimeout(keyState[code].das);
+  if(keyState[code].arr) clearInterval(keyState[code].arr);
+  delete keyState[code];
+}
+document.addEventListener('keydown', e => {
+  if(e.repeat) return;
+  if(e.code==='KeyP' || e.code==='Escape'){
+    if(game.gameOver) return;
+    game.paused = !game.paused;
+    renderPauseOverlay();
+    if(game.paused) audio.beep(200,0.04); else audio.beep(440,0.05);
+  }
+  handlePress(e.code);
+});
+document.addEventListener('keyup', e => handleRelease(e.code));
+
+restartBtn.addEventListener('click', ()=>{
+  game.reset(); updateHUD(); audio.beep(700,0.06);
+});
+pauseBtn.addEventListener('click', ()=>{
+  if(game.gameOver) return;
+  game.paused = !game.paused;
+  renderPauseOverlay();
+  if(game.paused) audio.beep(200,0.04); else audio.beep(440,0.05);
+});
+
+/* Onscreen controls */
+controlButtons.forEach(b => {
+  const code = b.dataset.key;
+  b.addEventListener('touchstart', e => { e.preventDefault(); handlePress(code); b.style.transform='translateY(2px)'; }, {passive:false});
+  b.addEventListener('touchend', e => { e.preventDefault(); handleRelease(code); b.style.transform=''; });
+  b.addEventListener('touchcancel', e => { e.preventDefault(); handleRelease(code); b.style.transform=''; });
+});
+
+/* Main loop */
+let lastTime=0;
+function loop(time){
+  if(!game.paused && !game.gameOver){
+    const delta = time-lastTime;
+    game.dropAcc += delta;
+    if(game.dropAcc > game.dropMs){
+      game.softDrop();
+      game.dropAcc = 0;
+    }
+  }
+  lastTime = time;
+  drawBoard();
+  drawMini(holdCanvas, game.holdPiece);
+  drawMini(nextCanvases[0], game.nextQueue[0]);
+  drawMini(nextCanvases[1], game.nextQueue[1]);
+  drawMini(nextCanvases[2], game.nextQueue[2]);
+  updateHUD();
+  if(game.gameOver){
+    showBubble('Гру закінчено!', 'honk');
+  }
+  requestAnimationFrame(loop);
+}
+
+focusTrap.addEventListener('focus', ()=> focusTrap.blur());
+game.onLinesCleared = (cleared, gained)=>{
+  wingBlink();
+  const text = ['', 'Лінія!', 'Подвійна!', 'Трійка!', 'ТЕТРІС!'][cleared] || '';
+  showBubble(text, 'speech');
+  audio.beep(800,0.08,'triangle');
+  if(cleared>1) audio.beep(1000,0.06,'triangle');
+  if(cleared>3) audio.beep(1200,0.1,'triangle');
+};
+
+if(window.location.hash==='#test') testbar.style.display = 'block';
+
+// Start
+updateHUD();
+loop(0);
+
+})();
+</script>
+</body>
+</html>
